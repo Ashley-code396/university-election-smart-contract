@@ -6,12 +6,13 @@ module university::university;
 // For Move coding conventions, see
 // https://docs.sui.io/concepts/sui-move-concepts/conventions
 /// Module: university
-#[allow(duplicate_alias)]
+
 module university::election {
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
+    
+   
     use sui::event;
-    use sui::transfer;
+    use std::string::String;
+    
     //use sui::vector;
     //use sui::option::{Self, Option};
 
@@ -27,15 +28,15 @@ module university::election {
         voting_power: u64,
         is_graduated: bool,
         last_updated: u64,
-        has_voted: bool,
+      bn  has_voted: bool,
     }
 
     // Candidate object
     public struct Candidate has key, store {
         id: UID,
         student_id: u64,
-        name: vector<u8>,
-        campaign_promises: vector<u8>,
+        name: vector<String>,
+        campaign_promises: vector<String>,
         vote_count: u64,
     }
 
@@ -72,7 +73,7 @@ module university::election {
 
     public struct CandidateRegistered has copy, drop {
         student_id: u64,
-        name: vector<u8>,
+        name: vector<String>,
     }
 
     public struct VoteCast has copy, drop {
@@ -169,8 +170,8 @@ module university::election {
     //Register as candidate (Juniors/Seniors only)
     public entry fun register_candidate(
         voter_nft: &StudentVoterNFT,
-        name: vector<u8>,
-        campaign_promises: vector<u8>,
+        name: vector<String>,
+        campaign_promises: vector<String>,
         ctx: &mut TxContext
     ) {
         assert!(voter_nft.voting_power >= 3, 1); // 3+ votes required
