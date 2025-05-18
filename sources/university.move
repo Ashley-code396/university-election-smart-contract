@@ -28,7 +28,7 @@ module university::election {
         voting_power: u64,
         is_graduated: bool,
         last_updated: u64,
-      bn  has_voted: bool,
+        has_voted: bool,
     }
 
     // Candidate object
