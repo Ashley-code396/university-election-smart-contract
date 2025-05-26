@@ -1,24 +1,36 @@
-/*
-/// Module: university
+
+ ///Module: university
 module university::university;
-*/
 
 // For Move coding conventions, see
 // https://docs.sui.io/concepts/sui-move-concepts/conventions
-/// Module: university
 
-module university::election {
+
+
+   //==IMPORTS===
+
+
     
-   
+
     use sui::event;
     use std::string::String;
     
-    //use sui::vector;
-    //use sui::option::{Self, Option};
 
-    // STRUCTS
+    // === ADMIN CAPABILITY ===
 
-    // Dynamic NFT for each student
+    public struct AdminCap has key {
+        id: UID,
+    }
+
+    /// Called once at module publish to mint the admin capability.
+      fun init(ctx: &mut TxContext) {
+        transfer::transfer(AdminCap {
+            id: object::new(ctx)
+        }, tx_context::sender(ctx))
+    }
+
+    // === STRUCTS ===
+
     public struct StudentVoterNFT has key, store {
         id: UID,
         name: vector<u8>,
@@ -31,7 +43,6 @@ module university::election {
         has_voted: bool,
     }
 
-    // Candidate object
     public struct Candidate has key, store {
         id: UID,
         student_id: u64,
@@ -40,7 +51,6 @@ module university::election {
         vote_count: u64,
     }
 
-    // Vote object (for audit/history)
     public struct Vote has key, store {
         id: UID,
         voter_id: u64,
@@ -48,14 +58,13 @@ module university::election {
         voting_power: u64,
     }
 
-    // Election result object
     public struct ElectionResult has key, store {
         id: UID,
         candidate_id: u64,
         total_votes: u64,
     }
 
-    //  EVENTS 
+    // === EVENTS ===
 
     public struct StudentVoterNFTCreated has copy, drop {
         student_id: u64,
@@ -87,9 +96,8 @@ module university::election {
         total_votes: u64,
     }
 
-    //HELPERS
+    // === HELPERS ===
 
-    // Convert u64 to vector<u8> (ASCII)
     fun u64_to_vector(value: u64): vector<u8> {
         let mut result: vector<u8> = vector::empty();
         let mut temp = value;
@@ -112,10 +120,11 @@ module university::election {
         reversed
     }
 
-    //ENTRY FUNCTIONS 
+    // === ENTRY FUNCTIONS ===
 
-    //Mint a new student NFT (called by admin/university)
+    /// ADMIN-ONLY: Mint a new student NFT
     public entry fun create_student_voting_nft(
+        admin: &AdminCap,
         student_id: u64,
         ctx: &mut TxContext
     ) {
@@ -135,7 +144,7 @@ module university::election {
         event::emit(StudentVoterNFTCreated { student_id, voting_power: 1 });
     }
 
-    //Update voting power (simulate academic progression, once per year)
+    // Update voting power (simulate academic progression, once per year)
     public entry fun update_voting_power(
         voter_nft: &mut StudentVoterNFT,
         current_time: u64
@@ -157,17 +166,17 @@ module university::election {
         }
     }
 
-    //Graduate student (deactivate NFT)
+    // Graduate student (deactivate NFT)
     public entry fun graduate_student(voter_nft: &mut StudentVoterNFT) {
         voter_nft.is_graduated = true;
         voter_nft.voting_power = 0;
         voter_nft.name = b"Graduated";
         voter_nft.description = b"You are no longer eligible to vote.";
-        voter_nft.image_url = b"https://example.com/voter-nft-graduated.png";
+        voter_nft.image_url = b"https://i.ibb.co/fzq9JmxX/element5-digital-T9-CXBZLUvic-unsplash.jpg";
         event::emit(StudentGraduated { student_id: voter_nft.student_id });
     }
 
-    //Register as candidate (Juniors/Seniors only)
+    // Register as candidate (Juniors/Seniors only)
     public entry fun register_candidate(
         voter_nft: &StudentVoterNFT,
         name: vector<String>,
@@ -189,7 +198,7 @@ module university::election {
         });
     }
 
-    //Cast a vote (one per student)
+    // Cast a vote (one per student)
     public entry fun cast_vote(
         voter_nft: &mut StudentVoterNFT,
         candidate: &mut Candidate,
@@ -213,8 +222,9 @@ module university::election {
         });
     }
 
-    //Tally votes and create results (admin only, at end of election)
+    /// ADMIN-ONLY: Tally votes and create results
     public entry fun tally_votes(
+        admin: &AdminCap,
         _votes: vector<Vote>,
         candidates: vector<Candidate>,
         ctx: &mut TxContext
@@ -238,4 +248,4 @@ module university::election {
         vector::destroy_empty(_votes);
         vector::destroy_empty(candidates);
     }
-}
+

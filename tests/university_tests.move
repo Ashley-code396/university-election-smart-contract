@@ -2,7 +2,7 @@
 #[test_only]
 module university::university_tests;
 // uncomment this line to import the module
- use university::election;
+ use university::university;
 use sui::test_scenario;
 
 const ENotImplemented: u64 = 0;
