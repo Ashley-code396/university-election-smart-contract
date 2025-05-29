@@ -254,3 +254,13 @@ module university::university;
         assert!(!voter_nft.is_graduated, 1);
         voter_nft.has_voted = false;
     }
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        transfer::transfer(AdminCap {
+            id: object::new(ctx)
+        }, tx_context::sender(ctx));
+    }
+public fun get_candidate_id(election: &Election, index: u64): ID {
+        assert!(index < vector::length(&election.candidate_ids), 0);
+        *vector::borrow(&election.candidate_ids, index)
+    }
