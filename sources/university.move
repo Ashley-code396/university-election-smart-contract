@@ -3,9 +3,18 @@ module university::university;
     use sui::event;
     use sui::url::{Self, Url};
     use sui::table::{Self, Table};
+    use sui::package::{Self, Publisher};
 
+
+
+    const ENotAuthorized: u64 = 0;
     // === ADMIN CAPABILITY ===
-    public struct AdminCap has key {
+    public struct UNIVERSITY has drop{}
+
+
+
+
+    public struct AdminCap has key, store {
         id: UID,
     }
 
@@ -90,14 +99,23 @@ module university::university;
 
     // === ENTRY FUNCTIONS ===
     /// Called once at module publish to mint the admin capability.
-    fun init(ctx: &mut TxContext) {
-        transfer::transfer(AdminCap {
+    fun init(otw: UNIVERSITY, ctx: &mut TxContext) {
+        let publisher: Publisher = sui::package::claim(otw, ctx);
+        transfer::public_transfer(publisher, ctx.sender())
+    }
+
+
+    public fun add_admin(cap: &Publisher, admin_address: address, ctx: &mut TxContext){
+        assert!(cap.from_module<AdminCap>(), ENotAuthorized);
+        let admin_cap = AdminCap{
             id: object::new(ctx)
-        }, tx_context::sender(ctx));
+        };
+        transfer::public_transfer(admin_cap, admin_address)
+
     }
 
     /// ADMIN-ONLY: Start a new election
-    public entry fun start_election(
+    public fun start_election(
         _admin: &AdminCap,
         election_id: u64,
         election_type: String,
@@ -116,7 +134,7 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Mint a new student NFT
-    public entry fun create_student_voting_nft(
+    public fun create_student_voting_nft(
         _admin: &AdminCap,
         student_id: u64,
         ctx: &mut TxContext
@@ -138,7 +156,7 @@ module university::university;
     }
 
     /// Update voting power (simulate academic progression, once per year)
-    public entry fun update_voting_power(
+    public  fun update_voting_power(
         voter_nft: &mut StudentVoterNFT,
         current_time: u64
     ) {
@@ -158,7 +176,7 @@ module university::university;
     }
 
     /// Graduate student (deactivate NFT)
-    public entry fun graduate_student(voter_nft: &mut StudentVoterNFT) {
+    public  fun graduate_student(voter_nft: &mut StudentVoterNFT) {
         voter_nft.is_graduated = true;
         voter_nft.voting_power = 0;
         voter_nft.name = b"Graduated".to_string();
@@ -168,7 +186,7 @@ module university::university;
     }
 
     /// Register as candidate (Juniors/Seniors only)
-    public entry fun register_candidate(
+    public fun register_candidate(
         voter_nft: &StudentVoterNFT,
         election: &mut Election,
         name: String,
@@ -192,7 +210,7 @@ module university::university;
     }
 
     /// Cast a vote (one per student)
-    public entry fun cast_vote(
+    public  fun cast_vote(
         voter_nft: &mut StudentVoterNFT,
         election: &mut Election,
         candidate_id: ID,
@@ -220,7 +238,7 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Tally votes for an election
-    public entry fun tally_votes(
+    public  fun tally_votes(
         _admin: &AdminCap,
         election: &mut Election,
         ctx: &mut TxContext
@@ -247,7 +265,7 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Reset voting status for a new election
-    public entry fun reset_voting_status(
+    public fun reset_voting_status(
         _admin: &AdminCap,
         voter_nft: &mut StudentVoterNFT
     ) {
