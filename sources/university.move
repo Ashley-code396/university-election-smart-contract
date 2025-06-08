@@ -3,16 +3,25 @@ module university::university;
     use sui::event;
     use sui::url::{Self, Url};
     use sui::table::{Self, Table};
-    use sui::package::{Self, Publisher};
+    use sui::package::Publisher;
 
 
 
+    // === ERROR CONSTANTS ===
     const ENotAuthorized: u64 = 0;
-    // === ADMIN CAPABILITY ===
+    const EAlreadyGraduated: u64 = 1;
+    const EAlreadyVoted: u64 = 2;
+    const ENotActive: u64 = 3;
+    const ECandidateNotFound: u64 = 4;
+    const EInvalidCandidateIndex: u64 = 5;
+
+
+    //===OTW STRUCT===
+   
     public struct UNIVERSITY has drop{}
 
 
-
+ // === ADMIN CAPABILITY ===
 
     public struct AdminCap has key, store {
         id: UID,
@@ -99,13 +108,15 @@ module university::university;
 
     // === ENTRY FUNCTIONS ===
     /// Called once at module publish to mint the admin capability.
-    fun init(otw: UNIVERSITY, ctx: &mut TxContext) {
-        let publisher: Publisher = sui::package::claim(otw, ctx);
-        transfer::public_transfer(publisher, ctx.sender())
-    }
+   fun init(otw: UNIVERSITY, ctx: &mut TxContext){
+        let publisher: Publisher = sui::package::claim(otw , ctx);
+
+        transfer::public_transfer(publisher, ctx.sender());
+
+   }
 
 
-    public fun add_admin(cap: &Publisher, admin_address: address, ctx: &mut TxContext){
+    public entry fun add_admin(cap: &Publisher, admin_address: address, ctx: &mut TxContext){
         assert!(cap.from_module<AdminCap>(), ENotAuthorized);
         let admin_cap = AdminCap{
             id: object::new(ctx)
@@ -115,8 +126,8 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Start a new election
-    public fun start_election(
-        _admin: &AdminCap,
+    public entry fun start_election(
+        admin: &AdminCap,
         election_id: u64,
         election_type: String,
         ctx: &mut TxContext){
@@ -134,7 +145,7 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Mint a new student NFT
-    public fun create_student_voting_nft(
+    public entry fun create_student_voting_nft(
         _admin: &AdminCap,
         student_id: u64,
         ctx: &mut TxContext
@@ -151,16 +162,17 @@ module university::university;
             last_updated: current_epoch,
             has_voted: false,
         };
-        transfer::transfer(voter_nft, tx_context::sender(ctx));
+        transfer::transfer(voter_nft, ctx.sender());
         event::emit(StudentVoterNFTCreated { student_id, voting_power: 1 });
     }
 
     /// Update voting power (simulate academic progression, once per year)
-    public  fun update_voting_power(
+    public entry  fun  update_voting_power(
         voter_nft: &mut StudentVoterNFT,
         current_time: u64
     ) {
-        assert!(!voter_nft.is_graduated, 0);
+        assert!(!voter_nft.is_graduated, EAlreadyGraduated);
+        assert!(!voter_nft.has_voted, EAlreadyVoted);
         let time_elapsed = current_time - voter_nft.last_updated;
         if (time_elapsed >= 365 * 24 * 60 * 60 && voter_nft.voting_power < 4) {
             voter_nft.voting_power = voter_nft.voting_power + 1;
@@ -176,7 +188,7 @@ module university::university;
     }
 
     /// Graduate student (deactivate NFT)
-    public  fun graduate_student(voter_nft: &mut StudentVoterNFT) {
+    public  entry fun graduate_student(voter_nft: &mut StudentVoterNFT) {
         voter_nft.is_graduated = true;
         voter_nft.voting_power = 0;
         voter_nft.name = b"Graduated".to_string();
@@ -186,7 +198,7 @@ module university::university;
     }
 
     /// Register as candidate (Juniors/Seniors only)
-    public fun register_candidate(
+    public entry fun register_candidate(
         voter_nft: &StudentVoterNFT,
         election: &mut Election,
         name: String,
@@ -210,16 +222,16 @@ module university::university;
     }
 
     /// Cast a vote (one per student)
-    public  fun cast_vote(
+    public  entry fun cast_vote(
         voter_nft: &mut StudentVoterNFT,
         election: &mut Election,
         candidate_id: ID,
         ctx: &mut TxContext
     ) {
-        assert!(!voter_nft.is_graduated, 2);
-        assert!(!voter_nft.has_voted, 3);
-        assert!(election.is_active, 4);
-        assert!(table::contains(&election.candidates, candidate_id), 5);
+        assert!(!voter_nft.is_graduated, EAlreadyGraduated);
+        assert!(!voter_nft.has_voted, EAlreadyVoted);
+        assert!(election.is_active, ENotActive);
+        assert!(table::contains(&election.candidates, candidate_id), ECandidateNotFound);
         let candidate = table::borrow_mut(&mut election.candidates, candidate_id);
         let vote = Vote {
             id: object::new(ctx),
@@ -229,7 +241,7 @@ module university::university;
         };
         candidate.vote_count = candidate.vote_count + voter_nft.voting_power;
         voter_nft.has_voted = true;
-        transfer::transfer(vote, tx_context::sender(ctx));
+        transfer::transfer(vote, ctx.sender());
         event::emit(VoteCast {
             voter_id: voter_nft.student_id,
             candidate_id: candidate.student_id,
@@ -238,7 +250,7 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Tally votes for an election
-    public  fun tally_votes(
+    public  entry fun tally_votes(
         _admin: &AdminCap,
         election: &mut Election,
         ctx: &mut TxContext
@@ -254,7 +266,7 @@ module university::university;
                 candidate_id: candidate_student_id,
                 total_votes,
             };
-            transfer::transfer(result, tx_context::sender(ctx));
+            transfer::transfer(result, ctx.sender());
             event::emit(ElectionResultsTallied {
                 candidate_id: candidate_student_id,
                 total_votes,
@@ -265,7 +277,7 @@ module university::university;
     }
 
     /// ADMIN-ONLY: Reset voting status for a new election
-    public fun reset_voting_status(
+    public entry fun reset_voting_status(
         _admin: &AdminCap,
         voter_nft: &mut StudentVoterNFT
     ) {
@@ -279,6 +291,6 @@ module university::university;
         }, tx_context::sender(ctx));
     }
 public fun get_candidate_id(election: &Election, index: u64): ID {
-        assert!(index < vector::length(&election.candidate_ids), 0);
+        assert!(index < vector::length(&election.candidate_ids), EInvalidCandidateIndex);
         *vector::borrow(&election.candidate_ids, index)
     }
